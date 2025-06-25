@@ -1,0 +1,758 @@
+{
+  "name": "USAR SIEMPRE - Youtube videos info - GOOD",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        40,
+        0
+      ],
+      "id": "95a3fc8c-7e1c-400a-9591-da3c961fa012",
+      "name": "When chat message received",
+      "webhookId": "f4106706-0434-46a6-90b1-cdba2f5efbb6"
+    },
+    {
+      "parameters": {
+        "resource": "video",
+        "returnAll": true,
+        "filters": {
+          "publishedAfter": "={{ new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() }}",
+          "q": "={{ $json.chatInput }}",
+          "regionCode": "US"
+        },
+        "options": {
+          "order": "relevance",
+          "safeSearch": "moderate"
+        }
+      },
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [
+        200,
+        0
+      ],
+      "id": "c888ece2-b4a3-481e-b2ef-472d66af8273",
+      "name": "YouTube",
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "KN73M6heFZkDB7AM",
+          "name": "YouTube account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/channels?",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "AIzaSyAv5KezIg6Dh_XSro1ETqK3sN8oP0iJW0c"
+            },
+            {
+              "name": "part",
+              "value": "contentDetails, snippet, statistics"
+            },
+            {
+              "name": "id",
+              "value": "={{ $json.snippet.channelId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        380,
+        100
+      ],
+      "id": "e282816c-8d1b-46fb-a982-c5a1cfdca100",
+      "name": "ChannelInfo"
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/videos?",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "AIzaSyAv5KezIg6Dh_XSro1ETqK3sN8oP0iJW0c"
+            },
+            {
+              "name": "part",
+              "value": "contentDetails, snippet, statistics"
+            },
+            {
+              "name": "id",
+              "value": "={{ $json.id.videoId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        380,
+        -140
+      ],
+      "id": "958e73d9-dcd9-4ac1-a393-edf84631c332",
+      "name": "VideoInfo"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Extract data for calculations\nconst views = Number($json.items[0].statistics.viewCount || 0);\nconst likes = Number($json.items[0].statistics.likeCount || 0);\nconst comments = Number($json.items[0].statistics.commentCount || 0);\n\n\n// Extract title and video ID\nconst title = $json.items[0].snippet.title || '';\nconst videoId = $json.items[0].id || '';\nconst youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;\n\n// Return only the essential data\nreturn {\n  title,\n  youtubeUrl,\n  views,\n  likes,\n  comments\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        -140
+      ],
+      "id": "e1d7b0d8-ee3f-43eb-9441-73a27544f807",
+      "name": "VideoInfoJson"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Extract data for calculations\nconst totalViews = Number($json.items[0].statistics.viewCount || 0);\nconst totalSubscribers = Number($json.items[0].statistics.subscriberCount || 0);\nconst totalVideos = Number($json.items[0].statistics.videoCount || 0);\nconst customUrl = String($json.items[0].snippet.customUrl || 0);\nconst channelTitle = String($json.items[0].snippet.title || 0);\n// Return only the essential data\nreturn {\n  channelTitle,\n  customUrl,\n  totalViews,\n  totalSubscribers,\n  totalVideos\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        100
+      ],
+      "id": "759a91c1-d103-4d61-8a03-f355ef25ec05",
+      "name": "ChannelInfoJson"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        900,
+        -20
+      ],
+      "id": "cfaffcb2-53a1-40b0-822a-cdcfc29dcb21",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// variables\nconst videoViews = Number($json.views || 0);\nconst videoLikes = Number($json.likes || 0);\nconst videoCommentsCount = Number($json.comments || 0);\nconst videoTitle = String($json.title || 0);\nconst youtubeVideoUrl = String($json.youtubeUrl || 0);\nconst customUrl = String($json.customUrl || 0);\nconst channelTotalViews = Number($json.totalViews || 0);\nconst channelTotalSubs = Number($json.totalSubscribers || 0);\nconst channelTotalVideos = Number($json.totalVideos || 0);\n\n\n\n// Calculate ratios\nconst likeRatio = videoViews > 0 ? (videoLikes / videoViews) * 100 : 0;\nconst commentRatio = videoViews > 0 ? (videoCommentsCount / videoViews) * 100 : 0;\nconst likeToCommentRatio = videoCommentsCount > 0 ? videoLikes / videoCommentsCount : 0;\nconst videoEngagementRatio = videoViews > 0 ? ((videoLikes + videoCommentsCount) / videoViews) * 100 : 0;\nconst videoLikeToCommentRatio = videoCommentsCount > 0 ? videoLikes / videoCommentsCount : 0;\nconst channelViewsPerVideoAvg = channelTotalVideos > 0 ? channelTotalViews / channelTotalVideos : 0;\nconst channelViewsToSubsRatio = channelTotalSubs > 0 ? channelTotalViews / channelTotalSubs : 0;\nconst videoViewsVsChannelAvgRatio = channelViewsPerVideoAvg > 0 ? (videoViews / channelViewsPerVideoAvg) * 100 : 0;\n\n\n\nreturn{\n  videoTitle,\n  youtubeVideoUrl,\n  customUrl,\n  videoViews,\n  videoLikes,\n  videoCommentsCount,\n  channelTotalViews,\n  channelTotalSubs,\n  channelTotalVideos,\n  likeRatio,\n  commentRatio,\n  likeToCommentRatio,\n  videoEngagementRatio,\n  videoLikeToCommentRatio,\n  channelViewsPerVideoAvg,\n  channelViewsToSubsRatio,\n  videoViewsVsChannelAvgRatio\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -20
+      ],
+      "id": "322cbf78-064c-433a-84e7-29ea7f9ff21e",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "aec87cc1-732c-4670-93e4-958654297f89",
+              "leftValue": "={{ $json.videoViews }}",
+              "rightValue": 1000,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "3acd8396-506b-4561-abd9-009a8fb339f8",
+              "leftValue": "={{ $json.commentRatio }}",
+              "rightValue": 0.25,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "fbdec4fa-38fe-426a-b96c-38e595871744",
+              "leftValue": "={{ $json.likeRatio }}",
+              "rightValue": 4,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "3a4722ec-819b-489d-864f-5bd2d8a4eafd",
+              "leftValue": "={{ $json.videoEngagementRatio }}",
+              "rightValue": 5,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "d6bc1b6d-cf96-4e40-9b5f-a8ac806c8cb8",
+              "leftValue": "={{ $json.channelViewsPerVideoAvg }}",
+              "rightValue": 1000,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "e776e2a0-07ba-4364-95ff-ca58a0d6aa9b",
+              "leftValue": "={{ $json.channelViewsToSubsRatio }}",
+              "rightValue": 50,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "64cb2511-1067-4a30-aa4e-550a609dc89f",
+              "leftValue": "={{ $json.videoViewsVsChannelAvgRatio }}",
+              "rightValue": 1.5,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        900,
+        220
+      ],
+      "id": "2e40a91a-7c4d-41b0-be5d-fa38860b1bd9",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        200
+      ],
+      "id": "008f92cc-f237-43fe-ba2b-d17dd68691c6",
+      "name": "Remove Duplicates"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.videoTitle }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Your job is to verify if the title is in English or not.\n\nRespond with one word answers.\n\n\"Yes\" for titles in English.\n\"No\" for titles not in English."
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.6,
+      "position": [
+        900,
+        420
+      ],
+      "id": "f89bd086-a290-451e-87de-6e799ac5153d",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        840,
+        580
+      ],
+      "id": "a7d219ff-69b2-4ddb-86f5-5ab49429df6d",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "Gi3TbeEP2DuT2zt1",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n\t\"Answer\": \"Yes or No\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        1040,
+        580
+      ],
+      "id": "57cf5768-0153-4be5-99d5-05baef2695d5",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "51272614-cfcc-49c4-b08d-f70e3d996057",
+              "leftValue": "={{ $json.output.Answer }}",
+              "rightValue": "Yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        420
+      ],
+      "id": "7b00c4cc-a5d1-4b57-a18a-284054d5ccbf",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "199YAKxAPSMkxRQW0KeOSV9s7ocJ-1i9kcO6q6JHZe_A",
+          "mode": "list",
+          "cachedResultName": "Videos Info",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/199YAKxAPSMkxRQW0KeOSV9s7ocJ-1i9kcO6q6JHZe_A/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/199YAKxAPSMkxRQW0KeOSV9s7ocJ-1i9kcO6q6JHZe_A/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "niche": "={{ $('When chat message received').item.json.chatInput }}",
+            "video_title": "={{ $('Remove Duplicates').item.json.videoTitle }}",
+            "youtube_video_url": "={{ $('Remove Duplicates').item.json.youtubeVideoUrl }}",
+            "channel_url": "={{ $('Remove Duplicates').item.json.customUrl }}",
+            "video_views": "={{ $('Remove Duplicates').item.json.videoViews }}",
+            "video_likes": "={{ $('Remove Duplicates').item.json.videoLikes }}",
+            "video_comments_count": "={{ $('Remove Duplicates').item.json.videoCommentsCount }}",
+            "channel_total_views": "={{ $('Remove Duplicates').item.json.channelTotalViews }}",
+            "channel_total_subs": "={{ $('Remove Duplicates').item.json.channelTotalSubs }}",
+            "channel_total_videos": "={{ $('Remove Duplicates').item.json.channelTotalVideos }}",
+            "likes_ratio": "={{ $('Remove Duplicates').item.json.likeRatio }}",
+            "comments_ratio": "={{ $('Remove Duplicates').item.json.commentRatio }}",
+            "like2comment_ratio": "={{ $('Remove Duplicates').item.json.likeToCommentRatio }}",
+            "video_engagement_ratio": "={{ $('Remove Duplicates').item.json.videoEngagementRatio }}",
+            "videolike2comment_ratio": "={{ $('Remove Duplicates').item.json.videoLikeToCommentRatio }}",
+            "channel_views_per_video_avg": "={{ $('Remove Duplicates').item.json.channelViewsPerVideoAvg }}",
+            "channelviews2subs_ratio": "={{ $('Remove Duplicates').item.json.channelViewsToSubsRatio }}",
+            "videoviewsVSchannelAvg_ratio": "={{ $('Remove Duplicates').item.json.videoViewsVsChannelAvgRatio }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "niche",
+              "displayName": "niche",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "video_title",
+              "displayName": "video_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "youtube_video_url",
+              "displayName": "youtube_video_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "channel_url",
+              "displayName": "channel_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "video_views",
+              "displayName": "video_views",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "video_likes",
+              "displayName": "video_likes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "video_comments_count",
+              "displayName": "video_comments_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "channel_total_views",
+              "displayName": "channel_total_views",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "channel_total_subs",
+              "displayName": "channel_total_subs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "channel_total_videos",
+              "displayName": "channel_total_videos",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "likes_ratio",
+              "displayName": "likes_ratio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "comments_ratio",
+              "displayName": "comments_ratio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "like2comment_ratio",
+              "displayName": "like2comment_ratio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "video_engagement_ratio",
+              "displayName": "video_engagement_ratio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "videolike2comment_ratio",
+              "displayName": "videolike2comment_ratio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "channel_views_per_video_avg",
+              "displayName": "channel_views_per_video_avg",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "channelviews2subs_ratio",
+              "displayName": "channelviews2subs_ratio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "videoviewsVSchannelAvg_ratio",
+              "displayName": "videoviewsVSchannelAvg_ratio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1440,
+        400
+      ],
+      "id": "f3c505c7-50f4-4b92-aa9f-2646414e1a8d",
+      "name": "Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "p038Qz13tin96WF5",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "YouTube",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YouTube": {
+      "main": [
+        [
+          {
+            "node": "VideoInfo",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "ChannelInfo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VideoInfo": {
+      "main": [
+        [
+          {
+            "node": "VideoInfoJson",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChannelInfo": {
+      "main": [
+        [
+          {
+            "node": "ChannelInfoJson",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VideoInfoJson": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChannelInfoJson": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Duplicates": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1daa59bc-af90-4f99-bfa4-1b04020bfdd1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2a03729b8ddef2ff770a781a7a720b3e7f7450420ffede6ea01cb1778ddbc3d5"
+  },
+  "id": "mONxuEk54QG5DipA",
+  "tags": []
+}

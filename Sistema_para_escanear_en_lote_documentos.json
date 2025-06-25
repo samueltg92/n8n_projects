@@ -1,0 +1,275 @@
+{
+  "name": "Sistema para escanear en lote documentos",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -140,
+        -40
+      ],
+      "id": "9693dd39-8649-4340-8c92-050cbc12003c",
+      "name": "When clicking ‘Test workflow’"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "returnAll": true,
+        "filter": {
+          "driveId": {
+            "mode": "list",
+            "value": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "value": "14w0AiHnyQ3b8qrn2Lk2iNLGOyPBBpQuM",
+            "mode": "list",
+            "cachedResultName": "Facturas Folder",
+            "cachedResultUrl": "https://drive.google.com/drive/folders/14w0AiHnyQ3b8qrn2Lk2iNLGOyPBBpQuM"
+          },
+          "whatToSearch": "files",
+          "fileTypes": [
+            "*"
+          ]
+        },
+        "options": {
+          "fields": [
+            "id",
+            "name"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        80,
+        -40
+      ],
+      "id": "ad2e0eb1-082e-4fa3-bf6b-2691b04dcc3a",
+      "name": "Google Drive",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "KQ41DdjYx1CkkCE9",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        300,
+        -40
+      ],
+      "id": "32fc6d71-c972-4dd3-a04a-98d296e5434b",
+      "name": "Google Drive1",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "KQ41DdjYx1CkkCE9",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  return {\n    json: {\n      base64: item.binary.data.data\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        -40
+      ],
+      "id": "cc162961-504b-45c0-b718-916529c463ab",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://vision.googleapis.com/v1/files:annotate?key=AIzaSyA_TkACZ_29PqAIiIDwbbC-Cl1sxrEWjQk",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={\n\"Content-Type\": \"application/json\"\n}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"requests\": [\n    {\n      \"inputConfig\": {\n        \"mimeType\": \"application/pdf\",\n        \"content\": \"{{ $json.base64 }}\"\n      },\n      \"features\": [\n        {\n          \"type\": \"DOCUMENT_TEXT_DETECTION\"\n        }\n      ],\n      \"pages\": [1]\n    }\n  ]\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        740,
+        -40
+      ],
+      "id": "42ec5bac-8116-4024-9400-2b9621cc8b1b",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        960,
+        -40
+      ],
+      "id": "81d9e058-c360-480a-9a54-58f6ba0d8530",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Eres un asistente que devuelve solamente objetos JSON válidos y sin formato. No utilices backticks, etiquetas, ni explicaciones.",
+              "role": "system"
+            },
+            {
+              "content": "=Extrae los siguientes campos del texto. Devolver un objeto JSON plano, sin explicaciones ni formato:\n\n- fecha\n- número de presupuesto\n- nombre del cliente\n- domicilio\n- localidad\n- productos (array de objetos con: código del producto, cantidad, descripción del producto, precio unitario, precio total)\n- precio total\n- celular\n- email\n\n- Texto a analizar:\n{{ $json.text }}",
+              "role": "system"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        1180,
+        -40
+      ],
+      "id": "e6907f16-0fc1-4b10-a23c-3f74ea474981",
+      "name": "OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "Gi3TbeEP2DuT2zt1",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\nlet output = [];\n\nfor (const item of allItems) {\n  const data = item.json.message?.content || {};\n  const productos = Array.isArray(data.productos) ? data.productos : [];\n  \n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        -40
+      ],
+      "id": "ec2951ec-040b-407d-bc3c-1d07f1ffbe8d",
+      "name": "Code1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Google Drive1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive1": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "34b2dc32-5c00-45ef-8fdf-f40b2b122cf0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2a03729b8ddef2ff770a781a7a720b3e7f7450420ffede6ea01cb1778ddbc3d5"
+  },
+  "id": "S1Qjp5GTXn2kjdJC",
+  "tags": []
+}
